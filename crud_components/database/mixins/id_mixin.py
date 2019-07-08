@@ -1,6 +1,6 @@
 import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declared_attr
-from crud_components.validators.uid import uid_str, parse_uid
+from crud_components.utils.validators.uid import uid_str, parse_uid
 
 
 class IdMixinWithSequence:

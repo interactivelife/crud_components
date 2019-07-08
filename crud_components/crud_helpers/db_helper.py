@@ -7,7 +7,7 @@ from connexion import ProblemException, NoContent
 from flask import current_app
 from itsdangerous import JSONWebSignatureSerializer, BadSignature
 from ..database import UserFilters, UidMixin, make_search_queries
-from medicall.modelhelpers.traversal import ModelReadVisitor, ModelWriteVisitor
+from .model_visitor import ModelReadVisitor, ModelWriteVisitor
 
 
 class DbHelper:
@@ -151,7 +151,6 @@ class DbHelper:
         model_ins, _ = w_visitor.visit_model(model_ins, body, creating=True, only_field_names=only_field_names)
         model_ins.assert_uniqueness()
         w_visitor.pre_flush()
-        w_visitor.pre_versioning()
         self.db.session.flush()
         w_visitor.post_flush()
         self.db.session.flush()
@@ -212,7 +211,6 @@ class DbHelper:
         model_ins, changes = w_visitor.visit_model(model_ins, body, creating=False, only_field_names=only_field_names)
         model_ins.assert_uniqueness()
         w_visitor.pre_flush()
-        w_visitor.pre_versioning()
         self.db.session.flush()
         changes += w_visitor.post_flush()
         self.db.session.flush()
@@ -231,8 +229,6 @@ class DbHelper:
         del_visitor.queue_model_execution(model_ins, None)
         del_visitor.pre_flush_delete()
 
-        v_visitor = VersioningVisitor(self.db.session)
-        v_visitor.visit_all()
         return NoContent, 204
 
     def metadata_helper(self, field_names):

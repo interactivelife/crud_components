@@ -1,5 +1,5 @@
 from ...exceptions import ModelValidationError
-from crud_components.validators.uid import uid_str, parse_uid, Uid
+from crud_components.utils.validators.uid import uid_str, parse_uid, Uid
 
 
 class UidMixin:

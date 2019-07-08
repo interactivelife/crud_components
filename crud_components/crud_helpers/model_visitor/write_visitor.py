@@ -1,133 +1,19 @@
 import logging
 from collections import defaultdict, OrderedDict
-import itertools
 
-from colour import Color
-from sqlalchemy import orm
-from sqlalchemy.ext.orderinglist import OrderingList
-from sqlalchemy.orm import attributes
-from sqlalchemy_utils.functions import getdotattr
-from geoalchemy2.shape import to_shape, from_shape
-from sqlalchemy.orm.attributes import InstrumentedAttribute
 import geoalchemy2 as ga
-
-from ..database import ColumnInfo
-from ..exceptions import ModelValidationError, MetadataValidationProblem
-from ..modelhelpers import Jsonifiable
-from ..modelhelpers.extension import Stage
-from ..database import BaseModel, SummaryMixin, SkipExtension, ExecutePostFlush, parse_field_names
-from ..validators import parse_uid
-from ..database.mixins import WeakVersionableMixin, WeakVersionedMixin, VersionedMixin
-
+from colour import Color
+from sqlalchemy.ext.orderinglist import OrderingList
+from sqlalchemy.orm.attributes import InstrumentedAttribute
+from sqlalchemy_utils.functions import getdotattr
+from geoalchemy2.shape import to_shape
+from crud_components.exceptions import ModelValidationError, ExecutePostFlush
+from crud_components.utils import Jsonifiable, parse_uid
+from crud_components.database import BaseModel, SummaryMixin, parse_field_names, RelationshipInfo
+from crud_components.extension import Stage
+from crud_components.exceptions import SkipExtension
 
 logger = logging.getLogger(__name__)
-
-
-class ModelReadVisitor:
-
-    def __init__(self, session, with_extensions=None):
-        self.session = session
-        self.with_extensions = with_extensions
-        self.include_map = {}
-
-    def visit_summary(self, instance):
-        if instance is None:
-            return None
-        elif isinstance(instance, SummaryMixin):
-            assert isinstance(instance, BaseModel)
-            dikt = dict(
-                text=instance.summary_text,
-                subtext=instance.summary_subtext,
-            )
-            for field in instance.crud_metadata.summary_fields:
-                name = field.extras['summary']
-                if name is True:
-                    name = None
-                self.visit_field(dikt, instance, field, name=name)
-            return dikt
-        else:
-            return self.visit_model(instance, summary=False)
-
-    def visit_model(self, instance, field_names=None, summary=False, exclude=None, include=None):
-        # include_map is not emptied after visiting the object.
-        # Same visitor would save the include_map for more than 1 object.
-        include = set(include or []).union(self.include_map.get(type(instance), ([], tuple()))[1] or [])
-        if include or exclude:
-            _ , include_field_name_pairs = parse_field_names(instance.crud_metadata, include)
-            _ , exclude_field_name_pairs = parse_field_names(instance.crud_metadata, exclude)
-            field_name_pairs = [x for x in include_field_name_pairs if x not in exclude_field_name_pairs]
-            for f, sub_field_names in field_name_pairs:
-                if f.reference_kind:
-                    self.include_map[f.reference_to] = (f, sub_field_names)
-
-        assert instance is None or isinstance(instance, BaseModel), 'Invalid instance {!r}'.format(type(instance))
-        if summary and field_names:
-            raise ValueError("Did not expect fields array in summary response")
-
-        if summary:
-            return self.visit_summary(instance)
-
-        if instance is None:
-            return None
-
-        include = set(include or []).union(self.include_map.get(type(instance), ([], tuple()))[1] or [])
-        additional_names, field_name_pairs = parse_field_names(instance.crud_metadata, field_names, exclude=exclude, include=include)
-        dikt = self.visit_model_fields(instance, field_name_pairs, additional_names)
-
-        if additional_names:
-            # Still not empty
-            raise ValueError("Unexpected field names: {}".format(', '.join(map(repr, additional_names.keys()))))
-        return dikt
-
-    def visit_model_fields(self, instance, field_name_pairs, additional_names=None):
-        return instance.as_dict(self, field_name_pairs, with_extensions=self.with_extensions)
-
-    def visit_field(self, dikt, instance, field, field_names=None, name=None):
-        exposed_name = name or field.exposed_name
-        extension = field.extras.get('extension')
-        if extension is not None:
-            try:
-                extension_instance = instance.extension_instance(extension, self.session, with_extensions=self.with_extensions)
-                expose = extension_instance.expose
-            except SkipExtension:
-                return
-        elif field.exposed_as is None:
-            expose = lambda s, f, **kw: getdotattr(s, f.internal_name)
-        elif isinstance(field.exposed_as, str):
-            expose = lambda s, f, **kw: getdotattr(s, f.exposed_as)
-        elif callable(field.exposed_as):
-            expose = field.exposed_as
-        else:
-            raise TypeError('Field exposed_as is expected to be a string or a function')
-        exposed_value = expose(instance, field)
-        dikt[exposed_name] = self.visit_value(instance, field, exposed_value, field_names=field_names)
-
-    def visit_value(self, instance, field, value, field_names):
-        if field.type == 'reference':
-            return self.visit_reference(instance, field, value, field_names)
-        elif isinstance(value, ga.WKBElement):
-            point = to_shape(value)
-            return dict(longitude=str(point.x), latitude=str(point.y))
-        elif isinstance(value, Jsonifiable):
-            return value.as_jsonable_dict()
-        elif isinstance(value, Color):
-            return value.hex_l
-        return value
-
-    def visit_reference(self, instance, field, value, field_names):
-        summary = field_names and '_summary' in field_names
-        if summary and len(field_names) == 1:  # It's only X._summary that was matched
-            field_names = None
-        if field.reference_kind == 'single':
-            return self.visit_model(value, field_names=field_names, summary=summary)
-        elif field.reference_kind == 'multiple':
-            assert value is not None
-            return [
-                self.visit_model(v, field_names=field_names, summary=summary)
-                for v in value
-            ]
-        else:
-            raise ModelValidationError("Something is very wrong")
 
 
 class ModelWriteVisitor:
@@ -288,14 +174,6 @@ class ModelWriteVisitor:
         self._handle_execution_queue(self._executions, self._run_executions, Stage.PRE_FLUSH)
         self._handle_execution_queue(self._model_executions, self._run_model_executions, Stage.PRE_FLUSH)
 
-    def pre_versioning(self):
-        from .versioning_traversal import VersioningVisitor
-        v_visitor = VersioningVisitor(self.session, with_extensions=self.with_extensions)
-        v_visitor.visit_all()
-        for c_visitor in self._nested_visitors:
-            c_visitor._handle_execution_queue(c_visitor._model_executions, c_visitor._run_model_executions, Stage.PRE_VERSIONING)
-        self._handle_execution_queue(self._model_executions, self._run_model_executions, Stage.PRE_VERSIONING)
-
     def pre_flush_delete(self):
         self._handle_execution_queue(self._executions, self._run_executions, Stage.PRE_FLUSH_DELETE)
         self._handle_execution_queue(self._model_executions, self._run_model_executions, Stage.PRE_FLUSH_DELETE)
@@ -346,19 +224,12 @@ class ModelWriteVisitor:
 
             if extension_instance is None:
                 attribute_name = field.exposed_as if isinstance(field.exposed_as, str) else field.internal_name
-                if field.versioned and isinstance(instance, WeakVersionableMixin):
-                    instance = instance.latest_version
 
-                if not field.localizable:  # hasattr/getattr did not work for WidgetInstance.kind hybrid property
-                    instance_or_translation = instance
-                else:
-                    instance_or_translation = instance.current_translation
-
-                # assert hasattr(instance_or_translation, attribute_name)
-                setattr(instance_or_translation, attribute_name, unexposed_value)
+                # assert hasattr(instance, attribute_name)
+                setattr(instance, attribute_name, unexposed_value)
 
                 # force reorder of the children if the collection_class is ordering_list
-                attribute_value = getattr(instance_or_translation, attribute_name)
+                attribute_value = getattr(instance, attribute_name)
                 if isinstance(attribute_value, OrderingList):
                     attribute_value.reorder()
 
@@ -389,10 +260,6 @@ class ModelWriteVisitor:
 
     def visit_reference(self, instance, field, value):
         if field.reference_kind == 'single':
-            if field.versioned:
-                instance = instance.latest_version
-            if field.localizable:
-                return self.visit_reference_single_localizable(instance, field, value)
             return self.visit_reference_single(instance, field, value)
         else:
             assert field.reference_kind == 'multiple'
@@ -455,26 +322,21 @@ class ModelWriteVisitor:
         # determine relationship roles
         curr_to_other_rel = field.reference_relationship_role
 
-        if curr_to_other_rel is ColumnInfo.RelationshipRole.PARENT:
+        if curr_to_other_rel is RelationshipInfo.RelationshipRole.PARENT:
             # Being a PARENT, assumes the other side is a list of children
             # This will probably fail in ONETOONE cases (i.e. by explicitly setting uselist=False)
             # It will also fail if we are using a different kind of collection class
             assert isinstance(other_side, (list, tuple))
             other_field = field.reference_to.crud_metadata.find_field_by_internal_name(field.reference_backref)
-            assert other_field.reference_relationship_role is ColumnInfo.RelationshipRole.CHILD
+            assert other_field.reference_relationship_role is RelationshipInfo.RelationshipRole.CHILD
             for child in other_side:
                 # Reverse the relationship direction and delegate to the other part of this function
                 self.verify_relationship(child, current_side, other_field)
-        elif curr_to_other_rel is ColumnInfo.RelationshipRole.CHILD:
+        elif curr_to_other_rel is RelationshipInfo.RelationshipRole.CHILD:
             # When reaching here, we should not have a list, it must have been unrolled in the PARENT side
             assert isinstance(other_side, (BaseModel, type(None)))
             # get the original parent at the other side
             original_parent = getattr(current_side, field.internal_name)
-
-            # Ignore version changes in the parent
-            # TODO We're assuming it's going to be a newer version rather than an older one
-            if isinstance(original_parent, WeakVersionedMixin):  # field_metadata.versioned
-                original_parent = original_parent.unversioned
 
             # check the two models at the other side are the same
             if not (original_parent is None or original_parent is other_side):
@@ -484,31 +346,11 @@ class ModelWriteVisitor:
         else:
             raise NotImplementedError('Unexpected value for relationship_role {!r}'.format(curr_to_other_rel))
 
-    def visit_reference_single_localizable(self, instance, field, value):
-        assert value is None or isinstance(value, dict), 'Expected a dictionary'
-        instance_cls = instance.__translation_model__
-        attr = getattr(instance_cls, field.internal_name)
-        assert isinstance(attr, InstrumentedAttribute)
-        field_cls = attr.property.mapper.class_
-
-        old_instance = getattr(instance.current_translation, field.internal_name)
-        assert old_instance is None or isinstance(old_instance, field_cls)
-        if value is None:
-            # We are clearing a reference
-            changes = 0 if old_instance is None else 1
-            return None, changes
-
-        return self._reference_instance(field, field_cls, value, old_instance)
-
     def _reference_instance(self, field, field_cls, value, old_instance):
         assert value is not None
         # We have a value for this field
         uid_str = value.pop('uid', None)
         uid = parse_uid(uid_str)
-        if issubclass(field_cls, VersionedMixin) and uid is not None and not uid.version:
-            from sqlalchemy import func
-            vid = self.session.query(func.max(field_cls.version_id)).filter_by(id=uid.serial_id).limit(1).scalar()
-            uid = parse_uid(uid_str, version_id=vid)
         new_instance, creating = None, False
 
         if uid is None:

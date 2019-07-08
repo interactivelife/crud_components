@@ -12,7 +12,7 @@ from sqlalchemy import orm
 import sqlalchemy as sa
 
 from .helpers import parse_field_names
-from ..validators import parse_uid, ga_point_from_dict
+from crud_components.utils.validators import parse_uid, ga_point_from_dict
 from ..exceptions import MetadataValidationProblem
 
 logger = logging.getLogger(__name__)
