@@ -7,9 +7,10 @@ from .db_helper import DbHelper
 
 class BaseCrudHandler(CrudHook):
 
-    def __init__(self, logger, db, **kwargs):
+    def __init__(self, logger, db, nested=False, **kwargs):
         self.logger = logger
         self.db = db
+        self.nested = nested
         self.helper = kwargs.pop('db_helper', self.init_helper(**kwargs))
 
     def init_helper(self, **kwargs):
@@ -30,7 +31,8 @@ class BaseCrudHandler(CrudHook):
             self.db.session.rollback()
             self.on_failure(e)
             raise e
-        self.db.session.commit()
+        if not self.nested:
+            db.session.commit()
         return model_dict, code
 
     def update(self, model_uid, body, **kwargs):
@@ -45,7 +47,8 @@ class BaseCrudHandler(CrudHook):
             self.db.session.rollback()
             self.on_failure(e)
             raise e
-        self.db.session.commit()
+        if not self.nested:
+            db.session.commit()
         return model_dict, code
 
     def bulk_update(self, body, **kwargs):
@@ -65,7 +68,8 @@ class BaseCrudHandler(CrudHook):
             self.db.session.rollback()
             self.on_failure(e)
             raise e
-        self.db.session.commit()
+        if not self.nested:
+            db.session.commit()
         return dict(changes=1), 200
 
     def delete(self, model_uid, **kwargs):
@@ -80,7 +84,8 @@ class BaseCrudHandler(CrudHook):
             self.db.session.rollback()
             self.on_failure(e)
             raise e
-        self.db.session.commit()
+        if not self.nested:
+            db.session.commit()
         return res
 
     def metadata(self, fields):

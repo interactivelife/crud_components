@@ -151,7 +151,7 @@ class FieldInfo(dict):
         Indicates whether a field is readable by a user (ex: passwords shouldn't be readable)
         """
         self['readable'] = readable
-        return readable
+        return self
 
     def orderable(self, orderable=True):
         """
