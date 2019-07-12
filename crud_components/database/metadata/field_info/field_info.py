@@ -8,7 +8,25 @@ class FieldInfo(dict):
 
     @classmethod
     def get_info_keys(cls):
-        return [key for key, val in cls.__dict__ if callable(val) and key not in ('__init__', 'get_info_keys')]
+        """
+        Returns the list of methods names that set field information.
+        :return: Example: ['readable', 'unexposed_as', 'uid_prefix', 'needed_joins', etc....]
+        """
+        dict_methods = cls._extract_class_methods(dict)
+        info_methods = cls._extract_class_methods(cls)
+        return list(info_methods - dict_methods)
+    
+    @staticmethod
+    def _extract_class_methods(cls):
+        info_keys = set()
+        for attr_name in dir(cls):
+            if attr_name[0] == '_' or attr_name in ('__init__', 'get_info_keys', 'extras'):
+                continue
+            field = getattr(cls, attr_name)
+            if callable(field):
+                info_keys.add(attr_name)
+        return info_keys
+        
 
     def exposed(self, exposed=True):
         """
@@ -44,6 +62,18 @@ class FieldInfo(dict):
         It is supposed to be the inverse function of exposed_as
         """
         self['unexposed_as'] = mapping_func
+        return self
+
+    def unique(self, unique=True):
+        self['unique'] = unique
+        return self
+    
+    def internal_name(self, internal_name: str):
+        self['internal_name'] = internal_name
+        return self
+    
+    def alias_name(self, alias_name: str):
+        self['alias_name'] = alias_name
         return self
 
     def searchable(self, searchable=True):

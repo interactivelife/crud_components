@@ -1,9 +1,14 @@
 import logging
+import re
+import geoalchemy2 as ga
+import sqlalchemy as sa
+import sqlalchemy_utils as sau
+from sqlalchemy.dialects.postgresql import ExcludeConstraint, INT4RANGE, ARRAY
 from sqlalchemy import orm
 from sqlalchemy.ext.associationproxy import AssociationProxy, ASSOCIATION_PROXY
 from sqlalchemy.ext.hybrid import HYBRID_PROPERTY
-
 from crud_components.extension import ExtensionProperty
+from collections import namedtuple
 from ..field_metadata import FieldMetadata
 from .abstract_metadata_builder import AbstractMetadataBuilder
 
@@ -11,6 +16,34 @@ logger = logging.getLogger(__name__)
 
 
 class FieldMetadataBuilder(AbstractMetadataBuilder):
+    
+    TYPE_MAP = {
+        sa.Integer: "integer",
+        sa.String: "string",
+        sa.Unicode: "string",
+        sa.Text: "string",
+        sa.UnicodeText: "string",
+        sa.Numeric: "number",
+        sa.Float: "number",
+        sa.DECIMAL: "number",
+        sa.Date: "date",
+        sa.DateTime: "datetime",
+        sa.Time: "time",
+        sa.Enum: "enum",
+        ga.Geography: "location",
+        sa.Boolean: "boolean",
+        sa.Interval: "interval",
+        sau.ColorType: "color",
+        ARRAY: "array",
+        sau.IntRangeType: 'range',
+        # uid, reference, symbol
+    }
+    
+    ORDERABLE_TYPES = ('string', 'number', 'integer', 'date', 'datetime')
+    SEARCHABLE_TYPES = ('string', 'number', 'integer', 'date')
+
+    def __init__(self, model_name):
+        self.model_name = model_name
 
     @property
     def metadata_cls(self):
@@ -57,7 +90,7 @@ class FieldMetadataBuilder(AbstractMetadataBuilder):
             f = attr.class_attribute
             ftype = info.get('type', self.TYPE_MAP.get(type(f.type), default_type))
             if ftype is None:
-                raise ValueError("Did not find type of field {}.{}".format(self.mapper.entity.__name__, attr_key))
+                raise ValueError("Did not find type of field {}.{}".format(self.model_name, attr_key))
             nullable = bool(info.get('nullable', f.nullable))
             unique = bool(info.get('unique', f.unique))
             orderable = bool(info.get('orderable', ftype in self.ORDERABLE_TYPES))
@@ -72,7 +105,7 @@ class FieldMetadataBuilder(AbstractMetadataBuilder):
             ftype = info.get('type', default_type)
             if ftype is None:
                 raise ValueError(
-                    "Cannot infer type of hybrid property {}.{}".format(self.mapper.entity.__name__, attr_key))
+                    "Cannot infer type of hybrid property {}.{}".format(self.model_name, attr_key))
             elif ftype == 'enum':
                 raise ValueError("Cannot use enum type for hybrid property yet")
             nullable = bool(info.get('nullable', True))
@@ -88,7 +121,7 @@ class FieldMetadataBuilder(AbstractMetadataBuilder):
             ftype = info.get('type', default_type)
             if ftype is None:
                 raise ValueError("Cannot infer type of extension property {}->{}.{}".format(
-                    self.mapper.entity.__name__, attr.extension_cls.__name__, attr_key))
+                    self.model_name, attr.extension_cls.__name__, attr_key))
             elif ftype == 'enum':
                 raise ValueError("Cannot use enum type for hybrid property yet")
             implicit = bool(info.get('implicit', False))
@@ -117,7 +150,7 @@ class FieldMetadataBuilder(AbstractMetadataBuilder):
                 raise TypeError('Association proxy objects are kind of problematic')
             else:
                 logger.debug('Cannot handle association proxy; unexposed, so ignoring field {}.{}'.format(
-                    self.mapper.entity.__name__, attr_key))
+                    self.model_name, attr_key))
 
         if ftype == 'tags':
             assert info['tags_kind'], "Couldn't get kind of tags field"
@@ -153,3 +186,15 @@ class FieldMetadataBuilder(AbstractMetadataBuilder):
             attr_type=attr_type,
             extras=extras,
         )
+
+    def expose_name(self, *values):
+        # We have to use camelCase to keep it compatible with the client codegen
+        # See https://github.com/swagger-api/swagger-codegen/issues/6530
+        # And https://github.com/swagger-api/swagger-codegen/issues/4774
+        camel_case = ''.join(x.capitalize() or '_' for word in values for x in word.split('_'))
+        return camel_case[0].lower() + camel_case[1:]
+        # return '_'.join(values)
+
+    def beautify_name(self, value):
+        value = re.sub(r'([A-Z])', r' \1', value)
+        return value.replace('_', ' ').title().strip()  # TODO Localize field names

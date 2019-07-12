@@ -28,3 +28,6 @@ SQLAlchemy-Utils==0.34.0
 typing==3.7.4
 urllib3==1.25.3
 Werkzeug==0.15.4
+pycrypto==2.6.1
+pycrypto==2.6.1
+Shapely==1.6.1

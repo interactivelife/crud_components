@@ -5,8 +5,8 @@ from .relationship_metadata_builder import RelationshipMetadataBuilder
 
 class MetadataBuilderFactory:
 
-    def get_builder(self, attr):
+    def get_builder(self, model_name, attr):
         if isinstance(attr, orm.RelationshipProperty):
-            return RelationshipMetadataBuilder()
+            return RelationshipMetadataBuilder(model_name)
         else:
-            return FieldMetadataBuilder
+            return FieldMetadataBuilder(model_name)

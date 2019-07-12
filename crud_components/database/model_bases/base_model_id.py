@@ -1,3 +1,5 @@
+from ..mixins import UidMixin, IdMixin
+from .base_model import BaseModel
 
 
 class BaseModelWithUid(UidMixin, IdMixin, BaseModel):

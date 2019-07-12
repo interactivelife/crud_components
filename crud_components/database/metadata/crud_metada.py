@@ -15,30 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class CrudMetadata:
-    TYPE_MAP = {
-        sa.Integer: "integer",
-        sa.String: "string",
-        sa.Unicode: "string",
-        sa.Text: "string",
-        sa.UnicodeText: "string",
-        sa.Numeric: "number",
-        sa.Float: "number",
-        sa.DECIMAL: "number",
-        sa.Date: "date",
-        sa.DateTime: "datetime",
-        sa.Time: "time",
-        sa.Enum: "enum",
-        ga.Geography: "location",
-        sa.Boolean: "boolean",
-        sa.Interval: "interval",
-        sau.ColorType: "color",
-        ARRAY: "array",
-        IntRangeType: 'range',
-        # uid, reference, symbol
-    }
-    ORDERABLE_TYPES = ('string', 'number', 'integer', 'date', 'datetime')
-    SEARCHABLE_TYPES = ('string', 'number', 'integer', 'date')
-
+    
     # indicates which fields to include in the response
     FIELD_METADATA_KEYS = {
         'internal_name': False,  # Do not include
@@ -66,15 +43,6 @@ class CrudMetadata:
         'attr_type': False,
     }
     MISSING = object()
-
-    RELATIONSHIP_TYPE_MAPPING = {
-        (ONETOMANY, True): 'multiple',
-        (MANYTOONE, True): 'single',
-        (MANYTOMANY, True): 'multiple',
-        (ONETOMANY, False): 'single',
-        (MANYTOONE, False): 'single',
-        (MANYTOMANY, False): 'single',
-    }
 
     def __init__(self, cls, metadata_builder_factory):
         self.mapper = sa.inspect(cls)
@@ -218,12 +186,12 @@ class CrudMetadata:
             for info_dict in reversed(infos):
                 info.update(info_dict)
 
-            quick_search = info.get('quick_search', False)
+            quick_search = info.get('quick_search', None)
             if quick_search:
-                quick_search_field_names[attr_key] = quick_search if quick_search is not True else 'contains'
-
+                quick_search_field_names[attr_key] = quick_search
+            
             if info.get('summary', False):
-                summary_field_names.add(attr_key)
+                summary_field_names.add(attr_key)     
 
             if isinstance(attr, orm.RelationshipProperty):
                 if len(attr.local_remote_pairs) > len(attr.local_columns):
@@ -288,7 +256,7 @@ class CrudMetadata:
             for info_dict in reversed(infos):
                 info.update(info_dict)
 
-            builder = self.metadata_builder_factory.get_builder(attr)
+            builder = self.metadata_builder_factory.get_builder(self.mapper.entity.__name__, attr)
             metadata = builder.build(attr_key, attr, info)
 
             assert attr_key not in self.fields, 'Duplicate field name?'
@@ -308,6 +276,6 @@ class CrudMetadata:
 
         self.quick_search_fields = {self.fields[k]: operator for k, operator in quick_search_field_names.items()}
         self.summary_fields = frozenset(self.fields[k] for k in summary_field_names)
-
+      
     def __repr__(self):
         return '{}({})'.format(type(self).__name__, self.name)

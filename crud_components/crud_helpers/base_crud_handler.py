@@ -1,7 +1,7 @@
 import base64
 import json
 from Crypto.Hash import MD5
-from crud_components.crud_helpers.crud_hooks import CrudHook
+from .crud_hook import CrudHook
 from .db_helper import DbHelper
 
 

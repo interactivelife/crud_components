@@ -1,10 +1,10 @@
 import abc
 
 
-class AbstractMetadataBuilder(abc.abstractmethod):
+class AbstractMetadataBuilder(abc.ABC):
 
-    @abc.abstractmethod
     @property
+    @abc.abstractmethod
     def metadata_cls(self):
         raise NotImplementedError()
 

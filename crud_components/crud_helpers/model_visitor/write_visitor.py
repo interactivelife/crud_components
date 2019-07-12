@@ -108,13 +108,14 @@ class ModelWriteVisitor:
 
     def queue_field_execution(self, instance, field, value):
         executions = field.extras.get('executions')
-        execution_stages = (
-            ex_stage
-            for ex_stage, extensions in executions.items()
-            if extensions and ex_stage in (Stage.PRE_FLUSH, Stage.POST_FLUSH)
-        )
-        for stage in execution_stages:
-            self._executions[stage].append((instance, field, value))
+        if executions:
+            execution_stages = (
+                ex_stage
+                for ex_stage, extensions in executions.items()
+                if extensions and ex_stage in (Stage.PRE_FLUSH, Stage.POST_FLUSH)
+            )
+            for stage in execution_stages:
+                self._executions[stage].append((instance, field, value))
 
     def queue_model_execution(self, instance, value):
         execution_stages = (
@@ -126,17 +127,18 @@ class ModelWriteVisitor:
             self._model_executions[stage].append((instance, value))
 
     def _run_executions(self, stage, instance, field, value):
-        executions = field.extras.get('executions')
+        executions = field.extras.get('executions', None)
         overriden, override = None, False
-        for extension in executions[stage]:
-            try:
-                extension_instance = instance.extension_instance(extension, self.session, self.with_extensions)
-                steps = extension_instance.execute(self, stage, instance, field, value, overriden=overriden)
-                for step_overriden, step_override in steps:
-                    override = override or step_override
-                    overriden = step_overriden if override else overriden
-            except SkipExtension:
-                continue
+        if executions is not None:
+            for extension in executions[stage]:
+                try:
+                    extension_instance = instance.extension_instance(extension, self.session, self.with_extensions)
+                    steps = extension_instance.execute(self, stage, instance, field, value, overriden=overriden)
+                    for step_overriden, step_override in steps:
+                        override = override or step_override
+                        overriden = step_overriden if override else overriden
+                except SkipExtension:
+                    continue
         return overriden, override
 
     def _run_model_executions(self, stage, instance, value):

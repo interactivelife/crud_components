@@ -1,13 +1,26 @@
 from sqlalchemy import orm
 from sqlalchemy.ext.hybrid import HYBRID_PROPERTY
-from sqlalchemy.orm.base import MANYTOONE, ONETOMANY
-
+from sqlalchemy.orm.base import MANYTOMANY, MANYTOONE, ONETOMANY
 from crud_components.database.model_bases.abstract_base_model import AbstractBaseModel
 from .field_metadata_builder import FieldMetadataBuilder
 from ...field_info import RelationshipInfo
+from ..field_metadata import RelationshipMetadata
 
 
 class RelationshipMetadataBuilder(FieldMetadataBuilder):
+    
+    RELATIONSHIP_TYPE_MAPPING = {
+        (ONETOMANY, True): 'multiple',
+        (MANYTOONE, True): 'single',
+        (MANYTOMANY, True): 'multiple',
+        (ONETOMANY, False): 'single',
+        (MANYTOONE, False): 'single',
+        (MANYTOMANY, False): 'single',
+    }
+
+    @property
+    def metadata_cls(self):
+        return RelationshipMetadata
 
     def _process_info(self, attr_key, attr, info):
         info = super()._process_info(attr_key, attr, info)
