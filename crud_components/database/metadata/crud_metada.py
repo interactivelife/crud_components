@@ -9,7 +9,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm.base import ONETOMANY, MANYTOONE, MANYTOMANY
 from sqlalchemy_utils import IntRangeType
 from ..helpers import *
-from ...extension import *
+from ...model_extensions import *
 
 logger = logging.getLogger(__name__)
 

@@ -7,10 +7,9 @@ from sqlalchemy.dialects.postgresql import ExcludeConstraint, INT4RANGE, ARRAY
 from sqlalchemy import orm
 from sqlalchemy.ext.associationproxy import AssociationProxy, ASSOCIATION_PROXY
 from sqlalchemy.ext.hybrid import HYBRID_PROPERTY
-from crud_components.extension import ExtensionProperty
-from collections import namedtuple
-from ..field_metadata import FieldMetadata
 from .abstract_metadata_builder import AbstractMetadataBuilder
+from ..field_metadata import FieldMetadata
+from .....model_extensions import ExtensionProperty
 
 logger = logging.getLogger(__name__)
 

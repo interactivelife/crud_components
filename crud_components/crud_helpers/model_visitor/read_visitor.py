@@ -5,8 +5,8 @@ from sqlalchemy_utils.functions import getdotattr
 from geoalchemy2.shape import to_shape
 from crud_components.exceptions import ModelValidationError
 from crud_components.utils import Jsonifiable
-from crud_components.database import BaseModel, SummaryMixin, parse_field_names
-from crud_components.exceptions import SkipExtension
+from ...database import BaseModel, SummaryMixin, parse_field_names
+from ...model_extensions import SkipExtension
 
 logger = logging.getLogger(__name__)
 

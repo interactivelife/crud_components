@@ -1,4 +1,4 @@
-from ..mixins import UidMixin, IdMixin
+from ..mixins import UidMixin, IdMixin, id_with_sequence
 from .base_model import BaseModel
 
 

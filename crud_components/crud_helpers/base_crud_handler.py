@@ -32,7 +32,7 @@ class BaseCrudHandler(CrudHook):
             self.on_failure(e)
             raise e
         if not self.nested:
-            db.session.commit()
+            self.db.session.commit()
         return model_dict, code
 
     def update(self, model_uid, body, **kwargs):
@@ -48,7 +48,7 @@ class BaseCrudHandler(CrudHook):
             self.on_failure(e)
             raise e
         if not self.nested:
-            db.session.commit()
+            self.db.session.commit()
         return model_dict, code
 
     def bulk_update(self, body, **kwargs):
@@ -69,7 +69,7 @@ class BaseCrudHandler(CrudHook):
             self.on_failure(e)
             raise e
         if not self.nested:
-            db.session.commit()
+            self.db.session.commit()
         return dict(changes=1), 200
 
     def delete(self, model_uid, **kwargs):
@@ -85,7 +85,7 @@ class BaseCrudHandler(CrudHook):
             self.on_failure(e)
             raise e
         if not self.nested:
-            db.session.commit()
+            self.db.session.commit()
         return res
 
     def metadata(self, fields):

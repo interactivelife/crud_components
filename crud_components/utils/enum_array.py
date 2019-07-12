@@ -1,3 +1,4 @@
+import re
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import ARRAY
 

@@ -1,7 +1,8 @@
 from sqlalchemy import orm, inspect
 import sqlalchemy as sa
 from .abstract_base_model import AbstractBaseModel
-from ...exceptions import SkipExtension, ModelValidationError
+from ...model_extensions import SkipExtension
+from ...exceptions import  ModelValidationError
 
 
 class BaseModel(AbstractBaseModel):

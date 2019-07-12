@@ -1,46 +1,17 @@
 import logging
-import medicall.constants as C
-
-from sqlalchemy import func
-
-from medicall.models import Tile, VersionedTile, TileTranslation, WidgetInstance, VersionedSharedWidgetInstance
-from medicall.api import db
-from medicall.database import UserFilters
-from medicall.modelhelpers.traversal import ModelReadVisitor
-
 import base64
 from Crypto.Hash import MD5
 from itsdangerous import JSONWebSignatureSerializer, BadSignature
 from flask import current_app, json
 from connexion import ProblemException
-
+from ..database import UserFilters
 
 logger = logging.getLogger(__name__)
 
 
-def get_swi_use(uid):
-    result = []
-    q = db.session.query(Tile, func.max(VersionedTile.version_id)) \
-        .join(TileTranslation, Tile._current_translation) \
-        .join(VersionedTile, Tile.version_map) \
-        .join(WidgetInstance, VersionedTile.widget_instances) \
-        .join(VersionedSharedWidgetInstance, WidgetInstance.shared_widget_instance) \
-        .filter(
-        (VersionedSharedWidgetInstance.id == uid.serial_id)
-        # (SharedWidgetInstance.id == uid.serial_id) &
-        # (SharedWidgetInstance.version_id == uid.version)
-    ).group_by(Tile.id)
-
-    r_visitor = ModelReadVisitor(session=db.session)
-    for tile, max_version_id in q:
-        jsonable_dict = r_visitor.visit_model(tile, summary=True)
-        result.append(jsonable_dict)
-    return result
-
-
 def special_pagination(body, body_to_paginate, model_cls):
     body = body or dict()
-    count = body.get("count", C.DEFAULT_COUNT)
+    count = body.get("count", 10)
     current_token = body.get("paginationToken")
     current_page = body.get("page")
     filters = UserFilters(
