@@ -34,7 +34,7 @@ class UidValidator:
     UID_REGEX = re.compile('^([A-Z]{3})([VN])_([a-zA-Z0-9]+)(?:_([0-9]+))?$')
 
     # This should be populated by services using this package
-    VALID_PREFIXES = {}
+    VALID_PREFIXES = None
 
     CANARY2 = 0xA3
 
@@ -143,7 +143,8 @@ class UidValidator:
         return draft4_format_checker.checks(self.draft4_format, raises=UidValueError)(self)
 
     @classmethod
-    def init_app(cls, app):
+    def init_app(cls, app, valid_prefixes):
+        cls.VALID_PREFIXES = valid_prefixes
         salt = app.config['UID_SALT']
         validator = cls(prefix=cls.PREFIX_ANY, versioned=None, salt=salt).register()
         cls(prefix=cls.PREFIX_ANY, versioned=True, salt=salt).register()
