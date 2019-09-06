@@ -208,6 +208,10 @@ class FieldInfo(dict):
         self['tags_kind'] = tags_kind
         return self
 
+    def purpose(self, purpose: str):
+        self['purpose'] = purpose
+        return self
+
     def extras(self, extras):
         """
         Optional dict containing some info

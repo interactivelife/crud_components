@@ -8,6 +8,7 @@ from sqlalchemy import orm
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm.base import ONETOMANY, MANYTOONE, MANYTOMANY
 from sqlalchemy_utils import IntRangeType
+from sqlalchemy.ext.hybrid import HYBRID_PROPERTY
 from ..helpers import *
 from ...model_extensions import *
 
@@ -159,7 +160,10 @@ class CrudMetadata:
 
     def configure_fields(self):
         props = iter_properties(self.mapper)
-
+        
+        # todo small hack
+        props = filter(lambda prop: not (prop[0].extension_type is HYBRID_PROPERTY and prop[1] == 'attribute_getter'), props)
+        
         def _ordering_accessor(element, default):
             _, _, *info_dicts = element
             for info_dict in info_dicts:
@@ -247,6 +251,9 @@ class CrudMetadata:
                 execution_mapping[execution.name, execution.stage].add(extension)
 
         # Fourth, render the crud metadata according to the modified info dictionaries
+        # if self.name == 'Page':
+        #     import ipdb;
+        #     ipdb.set_trace()
         for attr, attr_key, *infos in props:
             assert attr_key is not None
             if attr_key in self._ignore_fields:
@@ -256,7 +263,18 @@ class CrudMetadata:
             for info_dict in reversed(infos):
                 info.update(info_dict)
 
-            builder = self.metadata_builder_factory.get_builder(self.mapper.entity.__name__, attr)
+            if 'extras' not in info:
+                info['extras'] = {}
+            info['extras']['executions'] = execs = dict()
+            for stage in Stage:
+                try:
+                    stage_execs = execution_mapping.pop((attr_key, stage))
+                except KeyError:
+                    execs[stage] = tuple()
+                else:
+                    execs[stage] = tuple(stage_execs)
+
+            builder = self.metadata_builder_factory.get_builder(self.mapper.entity.__name__, attr, info)
             metadata = builder.build(attr_key, attr, info)
 
             assert attr_key not in self.fields, 'Duplicate field name?'
