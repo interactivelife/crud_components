@@ -17,6 +17,7 @@ class ModelReadVisitor:
         self.session = session
         self.with_extensions = with_extensions
         self.include_map = {}
+        self._visited = set()
 
     def visit_summary(self, instance):
         if instance is None:
@@ -88,6 +89,11 @@ class ModelReadVisitor:
         else:
             raise TypeError('Field exposed_as is expected to be a string or a function')
         exposed_value = expose(instance, field)
+        if field.type == 'reference':
+            if instance in self._visited:
+                return 
+            else:
+                self._visited.add(instance)
         dikt[exposed_name] = self.visit_value(instance, field, exposed_value, field_names=field_names)
 
     def visit_value(self, instance, field, value, field_names):
