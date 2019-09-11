@@ -250,6 +250,8 @@ class CrudMetadata:
             for execution in extension.__executions__.values():
                 execution_mapping[execution.name, execution.stage].add(extension)
 
+        self.before_metadata_build(quick_search_field_names, summary_field_names, props)
+
         # Fourth, render the crud metadata according to the modified info dictionaries
         # if self.name == 'Page':
         #     import ipdb;
@@ -294,6 +296,9 @@ class CrudMetadata:
 
         self.quick_search_fields = {self.fields[k]: operator for k, operator in quick_search_field_names.items()}
         self.summary_fields = frozenset(self.fields[k] for k in summary_field_names)
-      
+
+    def before_metadata_build(self, quick_search_field_names, summary_field_names, props):
+        pass
+
     def __repr__(self):
         return '{}({})'.format(type(self).__name__, self.name)
