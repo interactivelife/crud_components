@@ -183,7 +183,7 @@ class CrudMetadata:
 
         # First round, some properties (relationships mainly) may affect other properties
         for attr, attr_key, *infos in props:
-            if attr_key in self._ignore_fields:
+            if attr_key in self._ignore_fields or attr_key[0] == '_':
                 # Fields strictly for internal use
                 continue
             info = {}
@@ -250,7 +250,7 @@ class CrudMetadata:
             for execution in extension.__executions__.values():
                 execution_mapping[execution.name, execution.stage].add(extension)
 
-        self.before_metadata_build(quick_search_field_names, summary_field_names, props)
+        self.after_info_pre_processing(quick_search_field_names, summary_field_names, props)
 
         # Fourth, render the crud metadata according to the modified info dictionaries
         # if self.name == 'Page':
@@ -258,7 +258,7 @@ class CrudMetadata:
         #     ipdb.set_trace()
         for attr, attr_key, *infos in props:
             assert attr_key is not None
-            if attr_key in self._ignore_fields:
+            if attr_key in self._ignore_fields or attr_key[0] == '_':
                 # Fields strictly for internal use
                 continue
             info = {}
@@ -276,6 +276,7 @@ class CrudMetadata:
                 else:
                     execs[stage] = tuple(stage_execs)
 
+            self.before_metadata_build(attr_key, attr, info)
             builder = self.metadata_builder_factory.get_builder(self.mapper.entity.__name__, attr, info)
             metadata = builder.build(attr_key, attr, info)
 
@@ -297,7 +298,10 @@ class CrudMetadata:
         self.quick_search_fields = {self.fields[k]: operator for k, operator in quick_search_field_names.items()}
         self.summary_fields = frozenset(self.fields[k] for k in summary_field_names)
 
-    def before_metadata_build(self, quick_search_field_names, summary_field_names, props):
+    def after_info_pre_processing(self, quick_search_field_names, summary_field_names, props):
+        pass
+
+    def before_metadata_build(self, attr_key, attr, info):
         pass
 
     def __repr__(self):

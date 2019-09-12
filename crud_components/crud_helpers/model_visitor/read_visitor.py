@@ -61,6 +61,13 @@ class ModelReadVisitor:
 
         include = set(include or []).union(self.include_map.get(type(instance), ([], tuple()))[1] or [])
         additional_names, field_name_pairs = parse_field_names(instance.crud_metadata, field_names, exclude=exclude, include=include)
+
+        # circular reference check
+        assert instance not in self._visited, \
+            'Circular reference detected, break circular ref. by setting exposed(False). Models visited: {}'.format(
+                self._visited)
+        self._visited.add(instance)
+        
         dikt = self.visit_model_fields(instance, field_name_pairs, additional_names)
 
         if additional_names:
@@ -89,11 +96,6 @@ class ModelReadVisitor:
         else:
             raise TypeError('Field exposed_as is expected to be a string or a function')
         exposed_value = expose(instance, field)
-        if field.type == 'reference':
-            if instance in self._visited:
-                return 
-            else:
-                self._visited.add(instance)
         dikt[exposed_name] = self.visit_value(instance, field, exposed_value, field_names=field_names)
 
     def visit_value(self, instance, field, value, field_names):
